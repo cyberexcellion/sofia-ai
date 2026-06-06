@@ -2,6 +2,7 @@ import streamlit as st
 from groq import Groq
 from gtts import gTTS
 import os
+import base64
 
 # --- CONFIGURAÇÕES DA INTERFACE ---
 st.set_page_config(page_title="Protocolo Sofia", page_icon="🤖", layout="centered")
@@ -18,18 +19,19 @@ st.markdown("""
 CHAVE_API = "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"
 client = Groq(api_key=CHAVE_API)
 
-def gerar_voz(texto):
-    """Cria o áudio via gTTS e devolve os dados binários (bytes) para evitar silêncio no Android"""
+def gerar_audio_base64(texto):
+    """Transforma texto em áudio e converte para Base64 para forçar a reprodução no Android"""
     try:
         tts = gTTS(text=texto, lang='pt-pt', slow=False)
-        arquivo = "resposta_sofia.mp3"
+        arquivo = "temp_audio.mp3"
         tts.save(arquivo)
         
         with open(arquivo, "rb") as f:
-            audio_bytes = f.read()
+            data = f.read()
+            b64 = base64.b64encode(data).decode()
         
         os.remove(arquivo)
-        return audio_bytes
+        return b64
     except Exception as e:
         st.error(f"Erro na voz: {e}")
         return None
@@ -55,12 +57,12 @@ def mente_da_sofia(pergunta, historico):
     )
     return completion.choices[0].message.content
 
-# --- ESTADO DA SESSÃO (Memória) ---
+# --- ESTADO DA SESSÃO ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 st.title("🤖 Protocolo Sofia")
-st.caption("A Mestre Cibernética ao teu serviço em qualquer plataforma.")
+st.caption("A Mestre Cibernética. A voz agora é injetada via Base64.")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -76,9 +78,15 @@ if prompt := st.chat_input("O que desejas desvendar hoje?"):
             resposta = mente_da_sofia(prompt, st.session_state.messages[:-1])
             st.markdown(resposta)
             
-            # A MUDANÇA CRÍTICA: entrega de bytes para o Android
-            audio_bytes = gerar_voz(resposta)
-            if audio_bytes:
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            # SOLUÇÃO NUCLEAR: Injeção de áudio via HTML Base64
+            audio_b64 = gerar_audio_base64(resposta)
+            if audio_b64:
+                audio_html = f"""
+                <audio autoplay controls>
+                    <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+                    O teu browser não suporta este áudio.
+                </audio>
+                """
+                st.markdown(audio_html, unsafe_allow_html=True)
     
     st.session_state.messages.append({"role": "assistant", "content": resposta})
