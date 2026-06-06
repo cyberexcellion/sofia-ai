@@ -1,8 +1,5 @@
 import streamlit as st
 from groq import Groq
-from gtts import gTTS
-import os
-import base64
 
 # --- CONFIGURAÇÕES DA INTERFACE ---
 st.set_page_config(page_title="Protocolo Sofia", page_icon="🤖", layout="centered")
@@ -18,23 +15,6 @@ st.markdown("""
 # --- CONFIGURAÇÕES DO NÚCLEO ---
 CHAVE_API = "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"
 client = Groq(api_key=CHAVE_API)
-
-def gerar_audio_base64(texto):
-    """Transforma texto em áudio e converte para Base64 para forçar a reprodução no Android"""
-    try:
-        tts = gTTS(text=texto, lang='pt-pt', slow=False)
-        arquivo = "temp_audio.mp3"
-        tts.save(arquivo)
-        
-        with open(arquivo, "rb") as f:
-            data = f.read()
-            b64 = base64.b64encode(data).decode()
-        
-        os.remove(arquivo)
-        return b64
-    except Exception as e:
-        st.error(f"Erro na voz: {e}")
-        return None
 
 def mente_da_sofia(pergunta, historico):
     """Processa a resposta usando o Protocolo Sofia"""
@@ -57,12 +37,29 @@ def mente_da_sofia(pergunta, historico):
     )
     return completion.choices[0].message.content
 
+# --- FUNÇÃO DE VOZ VIA JAVASCRIPT (O Segredo da Solução) ---
+def falar_no_browser(texto):
+    """Injeta JavaScript para forçar o Android a falar usando a voz nativa do sistema"""
+    # Escapamos as aspas para não quebrar o JavaScript
+    texto_escapado = texto.replace('"', '\\"').replace('\n', ' ')
+    
+    js_code = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance('{texto_escapado}');
+    msg.lang = 'pt-PT';
+    msg.rate = 0.9; // Velocidade ligeiramente mais lenta para soar madura
+    msg.pitch = 1.0;
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.markdown(js_code, unsafe_allow_html=True)
+
 # --- ESTADO DA SESSÃO ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 st.title("🤖 Protocolo Sofia")
-st.caption("A Mestre Cibernética. A voz agora é injetada via Base64.")
+st.caption("Versão Suprema: Voz Nativa do Sistema (Web Speech API)")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -78,15 +75,7 @@ if prompt := st.chat_input("O que desejas desvendar hoje?"):
             resposta = mente_da_sofia(prompt, st.session_state.messages[:-1])
             st.markdown(resposta)
             
-            # SOLUÇÃO NUCLEAR: Injeção de áudio via HTML Base64
-            audio_b64 = gerar_audio_base64(resposta)
-            if audio_b64:
-                audio_html = f"""
-                <audio autoplay controls>
-                    <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-                    O teu browser não suporta este áudio.
-                </audio>
-                """
-                st.markdown(audio_html, unsafe_allow_html=True)
+            # A SOLUÇÃO SUPREMA: Comando direto ao sistema do Android
+            falar_no_browser(resposta)
     
     st.session_state.messages.append({"role": "assistant", "content": resposta})
